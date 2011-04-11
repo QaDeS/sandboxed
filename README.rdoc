@@ -12,7 +12,7 @@ See http://www.ruby-doc.org/docs/ProgrammingRuby/html/taint.html for more inform
 Sandboxed provides two methods directly in the Kernel module for convenience.
 
   safe do
-    ...
+    do_something
   end
 
   safe_method :my_method
@@ -39,13 +39,13 @@ Per default, code will be executed at $SAFE=4. To change this, use the :level op
 
 In case you want to publish local variables to the safe block, you can do so.
 
-  foo = "bar"
+  foo = "foo"
   safe(foo){ |foo| foo.reverse }  # => "oof"
 
 
 === Setting the context
 
-You can also set the context on which the given code block will operate on.
+You can also set the context which the given code block will operate on.
 
   safe(:context => 'foo') { reverse }  # => "oof"
 
