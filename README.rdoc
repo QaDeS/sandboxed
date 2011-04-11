@@ -1,0 +1,98 @@
+= Sandboxed
+
+A Ruby execution sandbox. Requires Ruby 1.9 or higher!
+It executes a code block at a given $SAFE level and handles the security of the context the code will operate on. Unsafe operations will raise a SecurityError.
+See http://www.ruby-doc.org/docs/ProgrammingRuby/html/taint.html for more information on $SAFE levels.
+
+
+== Usage
+
+=== Kernel Methods
+
+Sandboxed provides two methods directly in the Kernel module for convenience.
+
+  safe do
+    ...
+  end
+
+  safe_method :my_method
+
+
+=== Example
+
+A simple example would be a program that executes a line from STDIN.
+
+  require 'sandboxed'
+
+  code = gets.untaint
+  puts safe{ eval(code) }
+
+
+=== Setting the $SAFE level
+
+Per default, code will be executed at $SAFE=4. To change this, use the :level option.
+
+  safe(:level => 3) { ... }
+
+
+=== Passing in local variables
+
+In case you want to publish local variables to the safe block, you can do so.
+
+  foo = "bar"
+  safe(foo){ |foo| foo.reverse }  # => "oof"
+
+
+=== Setting the context
+
+You can also set the context on which the given code block will operate on.
+
+  safe(:context => 'foo') { reverse }  # => "oof"
+
+  bar = 'bar'
+  safe(bar, :context => 'foo') { |bar| bar + reverse }  # => "baroof"
+
+
+=== Publishing methods
+
+Some methods on your context might raise a SecurityError when called in a safe environment.
+
+  class MyContext
+    def log(text)
+      puts text       # would raise a SecurityError on $SAFE=4
+    end
+    safe_method :log  # this makes it safe to call
+  end
+
+  ctx = MyContext.new
+  safe(:context => ctx) do
+    log "something important"
+  end
+
+== Installation
+
+You can install Sandboxed via rubygems.
+
+  gem install sandboxed
+
+Or you can use Bundler.
+
+  echo "gem 'sandboxed'" >> Gemfile
+  bundle install
+
+That way, you can easily switch to the bleeding edge directly from the github repository.
+
+  gem 'sandboxed', :git => 'git://github.com/QaDeS/sandboxed.git'
+
+== Contributing
+
+For bug reports and feature requests, use the github tracker at
+https://github.com/QaDeS/sandboxed/issues
+
+If you want to get your hands dirty, please fork the project at
+https://github.com/QaDeS/sandboxed
+
+== Copyright
+
+Copyright (c) 2011 Michael Klaus. See LICENSE for details.
+
