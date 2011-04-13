@@ -25,10 +25,10 @@ describe Kernel do
       safe { 2 + 2 }.should == 4
     end
     it "should not execute unsafe operations" do
-      lambda{ safe{puts 'foo'} }.should raise_error SecurityError
+      lambda{ safe{puts 'foo'} }.should raise_error(SecurityError)
     end
     it "should allow access depending on the :level" do
-      lambda{ safe(:level => 0){'foo'.taint} }.should_not raise_error SecurityError
+      lambda{ safe(:level => 0){'foo'.taint} }.should_not raise_error(SecurityError)
     end
     it "should execute on the context object" do
       safe(:context => 'foo'){ reverse }.should == 'oof'
@@ -40,7 +40,7 @@ describe Kernel do
     end
     it "should pass in unsafe local variables" do
       arr = []
-      lambda{ safe(arr){|a| a << 'foo'} }.should raise_error SecurityError
+      lambda{ safe(arr){|a| a << 'foo'} }.should raise_error(SecurityError)
       arr.should == []
     end
     it "should pass in hash local variables and options" do
@@ -54,7 +54,7 @@ describe Kernel do
     end
 
     it "should not execute unsafe methods" do
-      lambda{ safe(:context => @ctx){internal_log 'foo'} }.should raise_error SecurityError
+      lambda{ safe(:context => @ctx){internal_log 'foo'} }.should raise_error(SecurityError)
     end
     it "should execute safe methods" do
       safe(:context => @ctx){sandbox_log 'foo'}.should == ['foo']

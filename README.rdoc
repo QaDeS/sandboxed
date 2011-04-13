@@ -1,6 +1,6 @@
 = Sandboxed
 
-A Ruby execution sandbox. Requires Ruby 1.9 or higher!
+A Ruby execution sandbox.
 It executes a code block at a given $SAFE level and handles the security of the context the code will operate on. Unsafe operations will raise a SecurityError.
 See http://www.ruby-doc.org/docs/ProgrammingRuby/html/taint.html for more information on $SAFE levels.
 
@@ -35,27 +35,39 @@ Per default, code will be executed at $SAFE=4. To change this, use the :level op
   safe(:level => 3) { ... }
 
 
-=== Passing in local variables
-
-In case you want to publish local variables to the safe block, you can do so.
-
-  foo = "foo"
-  safe(foo){ |foo| foo.reverse }  # => "oof"
-
-
 === Setting the context
 
 You can also set the context which the given code block will operate on.
 
   safe(:context => 'foo') { reverse }  # => "oof"
 
+
+=== Passing in local variables
+
+In the :overlay mode, which is the default, local variables are still usable. 
+
+  foo = "foo"
+  safe{ foo.reverse }  # => "oof"
+
+
+=== Context-only Mode
+
+For Ruby 1.8.7 or higher, :ctx_only mode is available. This means only the context is available to unsafe code. In case you want to publish local variables to the safe block, you have to pass them as parameters.
+
   bar = 'bar'
-  safe(bar, :context => 'foo') { |bar| bar + reverse }  # => "baroof"
+  safe(bar, :context => 'foo', :mode => :ctx_only) { |bar| bar + reverse }  # => "baroof"
+
+
+== Setting the default mode
+
+If you want to have :ctx_only ad the default mode for your application, you can do so.
+
+  Sandboxed.default_mode = :ctx_only
 
 
 === Publishing methods
 
-Some methods on your context might raise a SecurityError when called in a safe environment.
+Some methods on your context might (intentionally!) raise a SecurityError when called in a safe environment.
 
   class MyContext
     def log(text)
@@ -68,6 +80,15 @@ Some methods on your context might raise a SecurityError when called in a safe e
   safe(:context => ctx) do
     log "something important"
   end
+
+
+== Compatability
+
+Sandboxed was successfully tested on MRI and REE >= 1.8.6.
+JRuby does not support $SAFE levels, so we're pretty much out of luck.
+
+Test results and patches for other environments are greatly appreciated!
+
 
 == Installation
 
@@ -84,6 +105,7 @@ That way, you can easily switch to the bleeding edge directly from the github re
 
   gem 'sandboxed', :git => 'git://github.com/QaDeS/sandboxed.git'
 
+
 == Contributing
 
 For bug reports and feature requests, use the github tracker at
@@ -91,6 +113,7 @@ https://github.com/QaDeS/sandboxed/issues
 
 If you want to get your hands dirty, please fork the project at
 https://github.com/QaDeS/sandboxed
+
 
 == Copyright
 

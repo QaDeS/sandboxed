@@ -1,6 +1,6 @@
 unless Proc.method_defined?(:bind)
 
-  # copied from active_support proc.h to reduce dependencies
+  # copied from active_support proc.rb to reduce dependencies
   class Proc
     def bind(object)
       block, time = self, Time.now
