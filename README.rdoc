@@ -44,15 +44,24 @@ You can also set the context which the given code block will operate on.
 
 === Passing in local variables
 
-In the :overlay mode, which is the default, local variables are still usable. 
+Local variables are automatically passed into the safe block.
 
   foo = "foo"
   safe{ foo.reverse }  # => "oof"
 
+Even though they are accessible, unsave operations on them are prevented.
 
-=== Context-only Mode
+  arr = []
+  safe{ arr << 'foo' }  # => SecurityError
 
-For Ruby 1.8.7 or higher, :ctx_only mode is available. This means only the context is available to unsafe code. In case you want to publish local variables to the safe block, you have to pass them as parameters.
+To perform unsafe operations on them, you have to untrust them.
+
+  arr.untrust
+  safe{ arr << 'foo' }  # => ["foo"]
+
+=== Alternative modes
+
+Per default, Sandboxed uses :overlay mode, which prevents For Ruby 1.8.7 or higher, :ctx_only mode is available. This means only the context is available to unsafe code. In case you want to publish local variables to the safe block, you have to pass them as parameters.
 
   bar = 'bar'
   safe(bar, :context => 'foo', :mode => :ctx_only) { |bar| bar + reverse }  # => "baroof"
@@ -85,7 +94,7 @@ Some methods on your context might (intentionally!) raise a SecurityError when c
 == Compatability
 
 Sandboxed was successfully tested on MRI and REE >= 1.8.6.
-JRuby does not support $SAFE levels, so we're pretty much out of luck.
+JRuby does not support $SAFE levels, so we're pretty much out of luck. Same seems to be the case with Rubinius.
 
 Test results and patches for other environments are greatly appreciated!
 

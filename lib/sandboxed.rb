@@ -2,46 +2,96 @@ if RUBY_PLATFORM == 'jruby'
   warn "Sandboxed is not supported on JRuby"
 end
 
+require 'forwardable'
 require 'sandboxed/compat'
 require 'sandboxed/proc'
 require 'sandboxed/fiber'
 
 module Sandboxed
+  module ContextHolder
+    class << self
+      extend Forwardable
+      def contexts
+        Thread.current[:__contexts_] ||= []
+      end
+      def_delegator :contexts, :last, :current
+      def_delegator :contexts, :<<, :push
+      def_delegator :contexts, :pop
+    end
+
+    def method_missing(name, *args, &block)
+      if ctx = ContextHolder.contexts.last
+        if ctx.respond_to?(name)
+          return block ? ctx.send(name, *args, &block) : ctx.send(name, *args)
+        end
+      end
+      super
+    end
+  end
+
   module Modes
     class << self
-      def ctx_only(level, ctx, args, &block)
-        proc {
-          $SAFE=level
-          (ctx || eval("self", block.binding)).instance_exec(*args, &block)
-        }.call
+
+      if RUBY_VERSION < '1.8.7'
+        require 'rubygems'
+        require 'sourcify'
+        def bound(level, ctx, args, &block)
+          time = Time.now
+          method_name = "__bind_#{time.to_i}_#{time.usec}"
+          class << ctx; self; end.class_eval <<-RUBY
+            def #{method_name}(*args)
+              #{block.to_ruby}.call(*args)
+            end
+          RUBY
+          result = proc {
+            $SAFE=level
+            ctx.send method_name, *args
+          }.call
+          class << ctx; self; end.class_eval do
+            remove_method(method_name)
+          end
+          result
+        end
+      else
+        # less overhead, but only available on 1.8.7+
+        def bound(level, ctx, args, &block)
+          proc {
+            $SAFE=level
+            ctx.instance_exec(*args, &block)
+          }.call
+        end
       end
 
       def overlay(level, ctx, args, &block)
-        class << eval("self", block.binding)
-          include ContextHolder
-        end if ctx
+        # TODO support :only and :except options
+        ContextHolder.push ctx
+        begin
+          class << eval("self", block.binding)
+            include ContextHolder
+          end if ctx
 
-        proc {
-          $SAFE = level
-          yield *args
-        }.call
+          proc {
+            $SAFE = level
+            yield *args
+          }.call
+        ensure
+          ContextHolder.pop
+        end
       end
     end
   end
-  MODES = {:overlay => '1.8.6', :ctx_only => '1.8.7'}.reject{|m, v| v > RUBY_VERSION}
-  MODE_PREFERENCE = [:overlay, :ctx_only] & MODES.keys
+  MODES = [:bound, :overlay]
 
   class << self
 
     def default_mode
-      @default_mode ||= MODE_PREFERENCE.first
+      @default_mode ||= MODES.first
     end
     def default_mode=(mode)
       @default_mode = check_mode(mode)
     end
 
     def safe(*args, &block)
-      contexts = Thread.current[:__contexts_] ||= []
       opts = args.last.is_a?(Hash) ? args.pop : {}
       
       mode = opts.delete(:mode) || default_mode
@@ -51,9 +101,7 @@ module Sandboxed
       ctx = opts.delete(:context)
       args << opts unless opts.empty? # be nicer about passed in hashes
 
-      contexts << ctx
       result = Modes.send(mode, level, ctx, args, &block)
-      contexts.pop if ctx
 
       result
     end
@@ -64,6 +112,7 @@ module Sandboxed
         <<-RUBY
           alias #{safe_m} #{m}
           def #{m}(*args, &block)
+            return #{safe_m}(*args, &block) if $SAFE == 0  # performance shortcut
             result = SAFE_FIBER.resume([self, :#{safe_m}, args, block])
             result.is_a?(Exception) ? throw(result) : result  # TODO find a better way
           end
@@ -76,7 +125,7 @@ module Sandboxed
     def check_mode(m)
       mode = m.to_sym
       return mode if MODES.member?(mode)
-      raise ArgumentError, "Sandbox mode '#{mode}' is not defined; must be one of #{MODES.keys.map.join(', ')}"
+      raise ArgumentError, "Sandbox mode '#{mode}' is not defined; must be one of #{MODES.join(', ')}"
     end
 
   end
@@ -95,19 +144,9 @@ module Sandboxed
     end
   end.freeze
 
-  module ContextHolder
-    def method_missing(name, *args, &block)
-      if ctx = Thread.current[:__contexts_].last
-        if ctx.respond_to?(name)
-          return block ? ctx.send(name, *args, &block) : ctx.send(name, *args)
-        end
-      end
-      super
-    end
-  end
 end
 
-if mode = ENV['SANDBOX']
+if mode = ENV['SANDBOXED']
   Sandboxed.default_mode = mode
 end
 

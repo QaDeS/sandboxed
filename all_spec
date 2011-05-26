@@ -1,0 +1,6 @@
+#!/bin/bash
+
+current=`rvm current`
+echo $current
+rspec spec 2>&1 > "spec_results/${current}.log"
+
